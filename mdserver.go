@@ -92,7 +92,7 @@ func init() {
 
 // checkInterfaces - see if listener is bound to correct interface
 // first is localhost, second should be IP4 of active card,
-// third is IP6 localhost, fourth is IP6 for active card (on this system) 
+// third is IP6 localhost, fourth is IP6 for active card (on this system)
 func checkInterfaces() {
 	ifa, err := net.InterfaceAddrs()
 	if err != nil {
@@ -104,7 +104,7 @@ func checkInterfaces() {
 		fmt.Printf("Can't list interfaces\n")
 		os.Exit(1)
 	}
-	// check IP4 of active card 
+	// check IP4 of active card
 	myIfs := strings.Split(ifa[1].String(), "/")
 	myIf := myIfs[0]
 	if myIf != hostIPstr {

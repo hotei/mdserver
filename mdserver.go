@@ -57,10 +57,10 @@ func checkMdName(pathname string, info os.FileInfo, err error) error {
 	return nil
 }
 
-func makeMdLine(s string) []byte {
+func makeMdLine(i int, s string) []byte {
 	//workDir := serverRoot + mdURL[1:]
 	// s = s[len(workDir):]
-	return []byte(fmt.Sprintf("<a href=\"%s\">%s</a><br>", s, s))
+	return []byte(fmt.Sprintf("%d <a href=\"%s\">%s</a><br>", i,s, s))
 }
 
 func init() {
@@ -80,9 +80,9 @@ func init() {
 		os.Exit(-1)
 	}
 	fmt.Printf("g_fileNames = %v\n", g_fileNames)
-	for _, val := range g_fileNames {
+	for ndx, val := range g_fileNames {
 		//fmt.Printf("%v\n", val)
-		line := makeMdLine(val)
+		line := makeMdLine(ndx,val)
 		myMdDir = append(myMdDir, line...)
 	}
 	t := []byte(`</body></html>`)
@@ -168,7 +168,7 @@ func main() {
 	//http.Handle(serverRoot, http.StripPrefix(serverRoot, http.FileServer(http.Dir(serverRoot))))
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	http.HandleFunc(mdURL, mdHandler)
-	log.Printf("Markdown server is ready at %s\n", listenOnPort)
+	log.Printf("md server is ready at %s\n", listenOnPort)
 	err := http.ListenAndServe(listenOnPort, nil)
 	if err != nil {
 		log.Printf("mdserver: error running webserver %v", err)

@@ -35,10 +35,11 @@ or if go is not installed yet :
  * .mdown
  * .markdown
 * port number served is easily changed - default is 8281 (a random pick)
+* can be run at "localhost" if appropriate (more secure, but can't be used from other computers)
 
 ### Limitations
 
-* <font color="red">If used in forensic mode you may need to adjust file permissions of the markdown files to allow the server to read all files.</font>
+* <font color="red">If used in forensic environment you may need to adjust file permissions of the markdown files to allow the server to read all files.</font>
 
 ### Usage
 
@@ -62,6 +63,10 @@ None Known
 ### Change Log
 * 2014-03-25 Working
 * 2014-03-25 Started
+
+### Notes
+
+
 
 ### Resources
 

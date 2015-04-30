@@ -56,11 +56,11 @@ None Known
 * Essential:
  * TBD
 * Nice:
- * TBD
-* Nice but no immediate need:
- * TBD
+ * would benefit from a re-read of the serverRoot directory on periodic basis
+
 
 ### Change Log
+* 2015-04-30 revisited for go 1.4.2 update
 * 2014-03-25 Working
 * 2014-03-25 Started
 
@@ -83,9 +83,9 @@ License is BSD-two-clause, in file "LICENSE"
 
 License
 -------
-The 'program' go package/program is distributed under the Simplified BSD License:
+The 'mdserver' go package/program is distributed under the Simplified BSD License:
 
-> Copyright (c) 2014 David Rook. All rights reserved.
+> Copyright (c) 2014-2015 David Rook. All rights reserved.
 > 
 > Redistribution and use in source and binary forms, with or without modification, are
 > permitted provided that the following conditions are met:
@@ -107,6 +107,6 @@ The 'program' go package/program is distributed under the Simplified BSD License
 > NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 > ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Documentation (c) 2014 David Rook 
+Documentation (c) 2015 David Rook 
 
 // EOF README-mdserver.md  (this markdown document tested OK with blackfriday)

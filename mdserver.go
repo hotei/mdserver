@@ -1,10 +1,9 @@
-// multiserver.go (c) 2013 David Rook - all rights reserved
+// mdserver.go (c) 2013-2015 David Rook - all rights reserved
 
 package main
 
 import (
-	// go 1.2 std lib
-	//	"bytes"
+	// go 1.4.2 std lib
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -19,17 +18,19 @@ import (
 )
 
 const (
-	hostIPstr = "10.1.2.112" // loki - for localhost use 127.0.0.1
-	portNum   = 8281
-
-	serverRoot = "/home/mdr/Desktop/"
-	mdURL      = serverRoot
+	portNum    = 8281
+	wantLocal  = true
+	hostIPstr = "127.0.0.1"
+	// hostIPstr = "10.1.2.113" // loki is 112, mars is 113
+	serverRoot = "/home/mdr/Desktop/GO/GoDoc/"
+	mdURL      = "/md/"
 )
 
 var (
 	portNumString = fmt.Sprintf(":%d", portNum)
-	listenOnPort  = hostIPstr + portNumString
 	g_fileNames   []string // files with md content
+	listenOnPort  = hostIPstr + portNumString
+	nFiles int
 )
 
 var myMdDir = []byte{}
@@ -59,8 +60,11 @@ func checkMdName(pathname string, info os.FileInfo, err error) error {
 
 func makeMdLine(i int, s string) []byte {
 	//workDir := serverRoot + mdURL[1:]
-	// s = s[len(workDir):]
-	return []byte(fmt.Sprintf("%d <a href=\"%s\">%s</a><br>", i,s, s))
+	s = s[len(serverRoot):]
+	x := fmt.Sprintf("%d <a href=\"%s\">%s</a><br>", i, mdURL+s, s)
+	fmt.Printf("line: %s\n",x)
+	nFiles++
+	return []byte(x)
 }
 
 func init() {
@@ -82,12 +86,12 @@ func init() {
 	fmt.Printf("g_fileNames = %v\n", g_fileNames)
 	for ndx, val := range g_fileNames {
 		//fmt.Printf("%v\n", val)
-		line := makeMdLine(ndx,val)
+		line := makeMdLine(ndx, val)
 		myMdDir = append(myMdDir, line...)
 	}
 	t := []byte(`</body></html>`)
 	myMdDir = append(myMdDir, t...)
-	fmt.Printf("Init ran ok\n")
+	fmt.Printf("Init ran oks, found %d files to serve\n",nFiles)
 }
 
 // checkInterfaces - see if listener is bound to correct interface
@@ -99,14 +103,22 @@ func checkInterfaces() {
 		fmt.Printf("Can't list interfaces\n")
 		os.Exit(1)
 	}
-	fmt.Printf("Interfaces = %v\n", ifa)
+	fmt.Printf("Interfaces (ifa[]) = %v\n", ifa)
 	if len(ifa) < 2 {
 		fmt.Printf("Can't list interfaces\n")
 		os.Exit(1)
 	}
 	// check IP4 of active card
-	myIfs := strings.Split(ifa[1].String(), "/")
+	fmt.Printf("ifa[] = %v\n",ifa)
+	var myIfs []string
+	if wantLocal {
+	myIfs = strings.Split(ifa[0].String(), "/")
+	} else {
+	myIfs = strings.Split(ifa[1].String(), "/")
+	}
+	fmt.Printf("myIfs = %v\n",myIfs)
 	myIf := myIfs[0]
+	fmt.Printf("myIf = %v\n",myIf)
 	if myIf != hostIPstr {
 		log.Fatalf("handler bound to wrong interface")
 	}
@@ -120,7 +132,7 @@ func mdHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	var output []byte
 	var err error
-	fileName := r.URL.Path
+	fileName := serverRoot + r.URL.Path[len(mdURL):]
 	fmt.Printf("mdHandler: reading fname = %s\n", fileName)
 	ext := filepath.Ext(fileName)
 	if ext == ".md" || ext == ".markdown" || ext == ".mdown" {
@@ -169,6 +181,7 @@ func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	http.HandleFunc(mdURL, mdHandler)
 	log.Printf("md server is ready at %s\n", listenOnPort)
+	log.Printf("start browser with this url: %s%s\n",listenOnPort,mdURL)
 	err := http.ListenAndServe(listenOnPort, nil)
 	if err != nil {
 		log.Printf("mdserver: error running webserver %v", err)

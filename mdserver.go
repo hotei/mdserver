@@ -12,14 +12,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
+	"sync"
+	"time"
 	// non-local pkgs
 	"github.com/russross/blackfriday"
 )
 
 const (
-	portNum    = 8281
-	wantLocal  = true
+	portNum   = 8281
+	wantLocal = true
 	hostIPstr = "127.0.0.1"
 	// hostIPstr = "10.1.2.113" // loki is 112, mars is 113
 	serverRoot = "/home/mdr/Desktop/GO/GoDoc/"
@@ -27,15 +28,52 @@ const (
 )
 
 var (
-	portNumString = fmt.Sprintf(":%d", portNum)
-	g_fileNames   []string // files with md content
-	listenOnPort  = hostIPstr + portNumString
-	nFiles int
+	portNumString    = fmt.Sprintf(":%d", portNum)
+	g_fileNames      []string // files with md content
+	listenOnPort     = hostIPstr + portNumString
+	nFiles           int
+	loadingFilenames sync.Mutex
 )
 
 var myMdDir = []byte{}
 
 var pathName string
+
+func loadFiles() {
+	pathName := serverRoot
+	for {
+		nFiles = 0
+		loadingFilenames.Lock()
+		g_fileNames = make([]string, 0, 20)
+		myMdDir = []byte(`<html><!-- comment --><head><title>Test MD package</title>
+			</head><body>click link to read<br>refresh page if files added to server but
+			note list update may lag by up to a minute<br><p>`) // ??? next update at ---
+		stats, err := os.Stat(pathName)
+		if err != nil {
+			fmt.Printf("Can't get fileinfo for %s\n", pathName)
+			os.Exit(1)
+		}
+		if stats.IsDir() {
+			filepath.Walk(pathName, checkMdName)
+		} else {
+			fmt.Printf("this argument must be a directory (but %s isn't)\n", pathName)
+			os.Exit(-1)
+		}
+		fmt.Printf("g_fileNames = %v\n", g_fileNames)
+		for ndx, val := range g_fileNames {
+			//fmt.Printf("%v\n", val)
+			nFiles++
+			line := makeMdLine(ndx, val)
+			myMdDir = append(myMdDir, line...)
+		}
+		t := []byte(`</body></html>`)
+		myMdDir = append(myMdDir, t...)
+		fmt.Printf("Loaded files at %s and found %d files to serve\n",
+			serverRoot, nFiles)
+		loadingFilenames.Unlock()
+		time.Sleep(time.Minute)
+	}
+}
 
 func checkMdName(pathname string, info os.FileInfo, err error) error {
 	fmt.Printf("checking %s\n", pathname)
@@ -62,36 +100,13 @@ func makeMdLine(i int, s string) []byte {
 	//workDir := serverRoot + mdURL[1:]
 	s = s[len(serverRoot):]
 	x := fmt.Sprintf("%d <a href=\"%s\">%s</a><br>", i, mdURL+s, s)
-	fmt.Printf("line: %s\n",x)
-	nFiles++
+	fmt.Printf("line: %s\n", x)
 	return []byte(x)
 }
 
 func init() {
 	checkInterfaces()
-	pathName := serverRoot
-	g_fileNames = make([]string, 0, 20)
-	myMdDir = []byte(`<html><!-- comment --><head><title>Test MD package</title></head><body>click to read<br>`) // {}
-	stats, err := os.Stat(pathName)
-	if err != nil {
-		fmt.Printf("Can't get fileinfo for %s\n", pathName)
-		os.Exit(1)
-	}
-	if stats.IsDir() {
-		filepath.Walk(pathName, checkMdName)
-	} else {
-		fmt.Printf("this argument must be a directory (but %s isn't)\n", pathName)
-		os.Exit(-1)
-	}
-	fmt.Printf("g_fileNames = %v\n", g_fileNames)
-	for ndx, val := range g_fileNames {
-		//fmt.Printf("%v\n", val)
-		line := makeMdLine(ndx, val)
-		myMdDir = append(myMdDir, line...)
-	}
-	t := []byte(`</body></html>`)
-	myMdDir = append(myMdDir, t...)
-	fmt.Printf("Init ran oks, found %d files to serve\n",nFiles)
+	go loadFiles()
 }
 
 // checkInterfaces - see if listener is bound to correct interface
@@ -109,16 +124,16 @@ func checkInterfaces() {
 		os.Exit(1)
 	}
 	// check IP4 of active card
-	fmt.Printf("ifa[] = %v\n",ifa)
+	fmt.Printf("ifa[] = %v\n", ifa)
 	var myIfs []string
 	if wantLocal {
-	myIfs = strings.Split(ifa[0].String(), "/")
+		myIfs = strings.Split(ifa[0].String(), "/")
 	} else {
-	myIfs = strings.Split(ifa[1].String(), "/")
+		myIfs = strings.Split(ifa[1].String(), "/")
 	}
-	fmt.Printf("myIfs = %v\n",myIfs)
+	fmt.Printf("myIfs = %v\n", myIfs)
 	myIf := myIfs[0]
-	fmt.Printf("myIf = %v\n",myIf)
+	fmt.Printf("myIf = %v\n", myIf)
 	if myIf != hostIPstr {
 		log.Fatalf("handler bound to wrong interface")
 	}
@@ -127,7 +142,9 @@ func checkInterfaces() {
 // mdHandler recognizes markdown extensions and expands to html
 func mdHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == mdURL {
+		loadingFilenames.Lock()
 		w.Write(myMdDir)
+		loadingFilenames.Unlock()
 		return
 	}
 	var output []byte
@@ -181,7 +198,7 @@ func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	http.HandleFunc(mdURL, mdHandler)
 	log.Printf("md server is ready at %s\n", listenOnPort)
-	log.Printf("start browser with this url: %s%s\n",listenOnPort,mdURL)
+	log.Printf("start browser with this url: %s%s\n", listenOnPort, mdURL)
 	err := http.ListenAndServe(listenOnPort, nil)
 	if err != nil {
 		log.Printf("mdserver: error running webserver %v", err)

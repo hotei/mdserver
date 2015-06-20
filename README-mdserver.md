@@ -29,13 +29,15 @@ or if go is not installed yet :
 
 ### Features
 
-* Standalone webserver executable is about 7.5 MB
 * Serves files with the following extensions
  * .md
  * .mdown
  * .markdown
+* Standalone webserver executable is about 6.5 MB with go 1.4.2
+* supply a list of dirs if you want to exclude them from processing
 * port number served is easily changed - default is 8281 (a random pick)
 * can be run at "localhost" if appropriate (more secure, but can't be used from other computers)
+* refreshes list every 5 minutes (setable) 
 
 ### Limitations
 
@@ -56,10 +58,13 @@ None Known
 * Essential:
  * TBD
 * Nice:
- * would benefit from a re-read of the serverRoot directory on periodic basis
+ * TBD
 
 
 ### Change Log
+* 2015-06-20 minor update pushed
+	* skipDirs implemented
+	* suppress generic duplicated README.md 
 * 2015-04-30 revisited for go 1.4.2 update
 * 2014-03-25 Working
 * 2014-03-25 Started

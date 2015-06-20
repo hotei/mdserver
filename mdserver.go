@@ -23,7 +23,7 @@ const (
 	wantLocal = true
 	hostIPstr = "127.0.0.1"
 	// hostIPstr = "10.1.2.113" // loki is 112, mars is 113
-	serverRoot = "/home/mdr/Desktop/GO/GoDoc/"
+	serverRoot = "/home/mdr/Desktop/GO/"
 	mdURL      = "/md/"
 )
 
@@ -33,11 +33,28 @@ var (
 	listenOnPort     = hostIPstr + portNumString
 	nFiles           int
 	loadingFilenames sync.Mutex
+	delayReloadSecs  time.Duration = 300 // every 5 minutes
 )
+
+// suppress generic label README.md in these dirs
+// github.com wants a README.md but on my system these are just links 
+// to a more specific README-programName.md file
+var myGOs []string = []string{"GoGit", "GoHub", "GoWork", "GoDoc"}
+
+// skip these entirely
+var skipDirs []string = []string{
+	"/home/mdr/Desktop/GO/GoWork/src/hubmd/tests/",
+}
 
 var myMdDir = []byte{}
 
 var pathName string
+
+func init() {
+	log.SetFlags( /*log.LstdFlags | */ log.Lshortfile)
+	checkInterfaces()
+	go loadFiles()
+}
 
 func loadFiles() {
 	pathName := serverRoot
@@ -59,7 +76,7 @@ func loadFiles() {
 			fmt.Printf("this argument must be a directory (but %s isn't)\n", pathName)
 			os.Exit(-1)
 		}
-		fmt.Printf("g_fileNames = %v\n", g_fileNames)
+		log.Printf("g_fileNames = %v\n", g_fileNames)
 		for ndx, val := range g_fileNames {
 			//fmt.Printf("%v\n", val)
 			nFiles++
@@ -68,28 +85,41 @@ func loadFiles() {
 		}
 		t := []byte(`</body></html>`)
 		myMdDir = append(myMdDir, t...)
-		fmt.Printf("Loaded files at %s and found %d files to serve\n",
+		fmt.Printf("Loaded files from directory %s and found %d files to serve\n",
 			serverRoot, nFiles)
 		loadingFilenames.Unlock()
-		time.Sleep(time.Minute)
+		fmt.Printf("Sleeping for %d seconds\n", int(delayReloadSecs))
+		time.Sleep(delayReloadSecs * time.Second)
 	}
 }
 
 func checkMdName(pathname string, info os.FileInfo, err error) error {
-	fmt.Printf("checking %s\n", pathname)
+	//log.Printf("checking %s\n", pathname)
 	if info == nil {
 		fmt.Printf("WARNING --->  no stat info: %s\n", pathname)
 		os.Exit(1)
 	}
 	if info.IsDir() {
-		// return filepath.SkipDir
-		// g_fileNames = append(g_fileNames, pathname)
+		for i := 0; i < len(skipDirs); i++ {
+			if len(pathname) >= len(skipDirs[i]) {
+				if pathname[:len(skipDirs[i])] == skipDirs[i] {
+					return filepath.SkipDir
+				}
+			}
+		}
 		return nil
 	} else { // regular file
-		//fmt.Printf("found %s %s\n", pathname, filepath.Ext(pathname))
+		//log.Printf("found %s %s\n", pathname, filepath.Ext(pathname))
 		ext := filepath.Ext(pathname)
 		if ext == ".md" || ext == ".markdown" || ext == ".mdown" {
-			//fmt.Printf("appending\n")
+			//log.Printf("basename = %s\n", filepath.Base(pathname))
+			if filepath.Base(pathname) == "README.md" {
+				for _, v := range myGOs {
+					if strings.Contains(pathname, v) {
+						return nil
+					}
+				}
+			}
 			g_fileNames = append(g_fileNames, pathname)
 		}
 	}
@@ -100,14 +130,10 @@ func makeMdLine(i int, s string) []byte {
 	//workDir := serverRoot + mdURL[1:]
 	s = s[len(serverRoot):]
 	x := fmt.Sprintf("%d <a href=\"%s\">%s</a><br>", i, mdURL+s, s)
-	fmt.Printf("line: %s\n", x)
+	log.Printf("line: %s\n", x)
 	return []byte(x)
 }
 
-func init() {
-	checkInterfaces()
-	go loadFiles()
-}
 
 // checkInterfaces - see if listener is bound to correct interface
 // first is localhost, second should be IP4 of active card,

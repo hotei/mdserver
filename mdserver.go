@@ -37,7 +37,7 @@ var (
 )
 
 // suppress generic label README.md in these dirs
-// github.com wants a README.md but on my system these are just links 
+// github.com wants a README.md but on my system these are just links
 // to a more specific README-programName.md file
 var myGOs []string = []string{"GoGit", "GoHub", "GoWork", "GoDoc"}
 
@@ -134,7 +134,6 @@ func makeMdLine(i int, s string) []byte {
 	return []byte(x)
 }
 
-
 // checkInterfaces - see if listener is bound to correct interface
 // first is localhost, second should be IP4 of active card,
 // third is IP6 localhost, fourth is IP6 for active card (on this system)
@@ -223,6 +222,7 @@ func main() {
 	//http.Handle(serverRoot, http.StripPrefix(serverRoot, http.FileServer(http.Dir(serverRoot))))
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	http.HandleFunc(mdURL, mdHandler)
+	log.Printf("Compiled on %s\n", CompileDateTime)
 	log.Printf("md server is ready at %s\n", listenOnPort)
 	log.Printf("start browser with this url: %s%s\n", listenOnPort, mdURL)
 	err := http.ListenAndServe(listenOnPort, nil)

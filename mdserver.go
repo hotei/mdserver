@@ -1,9 +1,11 @@
 // mdserver.go (c) 2013-2015 David Rook - all rights reserved
-
+//
+// Serve markdown files over http
+//
+// TODO(mdr) need a way to watch fs for changes before re-starting loadFiles()
 package main
 
 import (
-	// go 1.4.2 std lib
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -14,7 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
-	// non-local pkgs
+	//
 	"github.com/russross/blackfriday"
 )
 
@@ -22,18 +24,30 @@ const (
 	portNum   = 8281
 	wantLocal = true
 	hostIPstr = "127.0.0.1"
-	// hostIPstr = "10.1.2.113" // loki is 112, mars is 113
+	// hostIPstr = "10.1.2.123"
+
 	serverRoot = "/home/mdr/Desktop/GO/"
+	imageRoot  = "/home/mdr/Desktop/webbies/"
 	mdURL      = "/md/"
+	imageURL   = "/images/"
 )
 
 var (
+	flagServerIPStr string
+	flagServerPort int
+	flagLocalHost bool
+	
 	portNumString    = fmt.Sprintf(":%d", portNum)
-	g_fileNames      []string // files with md content
 	listenOnPort     = hostIPstr + portNumString
+	
+	
 	nFiles           int
+	g_fileNames      []string // files with md content
 	loadingFilenames sync.Mutex
-	delayReloadSecs  time.Duration = 300 // every 5 minutes
+	delayReloadSecs  time.Duration = 300 // reload every 5 minutes
+	
+	myMdDir = []byte{}
+	pathName string
 )
 
 // suppress generic label README.md in these dirs
@@ -44,11 +58,7 @@ var myGOs []string = []string{"GoGit", "GoHub", "GoWork", "GoDoc"}
 // skip these entirely
 var skipDirs []string = []string{
 	"/home/mdr/Desktop/GO/GoWork/src/hubmd/tests/",
-}
-
-var myMdDir = []byte{}
-
-var pathName string
+} 
 
 func init() {
 	log.SetFlags( /*log.LstdFlags | */ log.Lshortfile)
@@ -62,9 +72,10 @@ func loadFiles() {
 		nFiles = 0
 		loadingFilenames.Lock()
 		g_fileNames = make([]string, 0, 20)
+		// 8888 TODO ??? next update at ---
 		myMdDir = []byte(`<html><!-- comment --><head><title>Test MD package</title>
 			</head><body>click link to read<br>refresh page if files added to server but
-			note list update may lag by up to a minute<br><p>`) // ??? next update at ---
+			note list update may lag by up to 5 minutes<br><p>`)
 		stats, err := os.Stat(pathName)
 		if err != nil {
 			fmt.Printf("Can't get fileinfo for %s\n", pathName)
@@ -76,7 +87,7 @@ func loadFiles() {
 			fmt.Printf("this argument must be a directory (but %s isn't)\n", pathName)
 			os.Exit(-1)
 		}
-		log.Printf("g_fileNames = %v\n", g_fileNames)
+		Verbose.Printf("g_fileNames = %v\n", g_fileNames)
 		for ndx, val := range g_fileNames {
 			//fmt.Printf("%v\n", val)
 			nFiles++
@@ -94,7 +105,7 @@ func loadFiles() {
 }
 
 func checkMdName(pathname string, info os.FileInfo, err error) error {
-	//log.Printf("checking %s\n", pathname)
+	Verbose.Printf("checking %s\n", pathname)
 	if info == nil {
 		fmt.Printf("WARNING --->  no stat info: %s\n", pathname)
 		os.Exit(1)
@@ -130,7 +141,7 @@ func makeMdLine(i int, s string) []byte {
 	//workDir := serverRoot + mdURL[1:]
 	s = s[len(serverRoot):]
 	x := fmt.Sprintf("%d <a href=\"%s\">%s</a><br>", i, mdURL+s, s)
-	log.Printf("line: %s\n", x)
+	Verbose.Printf("line: %s\n", x)
 	return []byte(x)
 }
 
@@ -222,7 +233,10 @@ func main() {
 	//http.Handle(serverRoot, http.StripPrefix(serverRoot, http.FileServer(http.Dir(serverRoot))))
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 	http.HandleFunc(mdURL, mdHandler)
+	http.HandleFunc(imageURL, imageHandler)
 	log.Printf("Compiled on %s\n", CompileDateTime)
+	log.Printf("Server Root = %s\n", serverRoot)
+	log.Printf("image urls syntax required is: http://:%s/images/x.png for example\n", listenOnPort)
 	log.Printf("md server is ready at %s\n", listenOnPort)
 	log.Printf("start browser with this url: %s%s\n", listenOnPort, mdURL)
 	err := http.ListenAndServe(listenOnPort, nil)

@@ -12,7 +12,7 @@ all:
 
 # change cp to echo if you really don't want to install the program
 install:
-	godatetime > compileDate.go
+#	godatetime > compileDate.go (comment out temporarily for travis)
 	go build -v
 	go tool vet .
 	go tool vet -shadow .

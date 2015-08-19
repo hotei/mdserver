@@ -305,7 +305,7 @@ func main() {
 	go loadFiles()
 	http.HandleFunc(mdURL, mdHandler)
 	http.HandleFunc(imageURL, imageHandler)
-	log.Printf("Compiled on %s\n", CompileDateTime)
+	//log.Printf("Compiled on %s\n", CompileDateTime)
 	log.Printf("Version = %s\n", version)
 	log.Printf("Server root = %s\n", serverRoot)
 	log.Printf("Image root = %s\n", imageRoot)

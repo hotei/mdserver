@@ -1,22 +1,49 @@
 # Makefile for mdserver
-
+	
 PROG = mdserver
+VERSION = 0.0.2
+TARDIR = 	$(HOME)/Desktop/TarPit/
+DATE = 	`date "+%Y-%m-%d.%H_%M_%S"`
+DOCOUT = README-$(PROG)-godoc.md
 
 all:
-	go build
+	godatetime > compileDate.go
+	go build -v
 
-
-# note godatetime is optional - if used it goes before 'go build'
-#     if godatetime is not used you need to comment out where it's used in *.go
+# change cp to echo if you really don't want to install the program
 install:
+	godatetime > compileDate.go
+	go build -v
 	go tool vet .
 	go tool vet -shadow .
-	godatetime > compileDate.go
-	go build
 	gofmt -w *.go
-	godoc2md . > README-$(PROG)-pkg-godoc.md
-	godepgraph -md -p . >> README-$(PROG)-pkg-godoc.md
-	cp mdserver $(HOME)/bin
+#	killall -q $(PROG)
+	cp $(PROG) $(HOME)/bin
+#	go install
+
+# note that godepgraph can be used to derive .travis.yml install: section
+docs:
+	godoc2md . > $(DOCOUT)
+	godepgraph -md -p . >> $(DOCOUT)
+	deadcode -md >> $(DOCOUT)
+	cp README-$(PROG).md README.md
+	cat $(DOCOUT) >> README.md
 
 neat:
-	gofmt -w *.go
+	go fmt ./...
+
+dead:
+	deadcode > problems.dead
+
+index:
+	cindex .
+
+clean:
+	go clean ./...
+	rm -f *~ problems.dead count.out
+	rm -f $(DOCOUT) README2.md
+
+tar:
+	echo $(TARDIR)$(PROG)_$(VERSION)_$(DATE).tar
+	tar -ncvf $(TARDIR)$(PROG)_$(VERSION)_$(DATE).tar .
+

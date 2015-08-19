@@ -6,6 +6,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -21,32 +22,35 @@ import (
 )
 
 const (
-	portNum   = 8281
-	wantLocal = true
-	hostIPstr = "127.0.0.1"
-	// hostIPstr = "10.1.2.123"
-
 	serverRoot = "/home/mdr/Desktop/GO/"
 	imageRoot  = "/home/mdr/Desktop/webbies/"
 	mdURL      = "/md/"
 	imageURL   = "/images/"
+	version    = "mdserver version 0.0.2 (c) 2015 David Rook"
 )
 
 var (
-	flagServerIPStr string
-	flagServerPort int
-	flagLocalHost bool
-	
-	portNumString    = fmt.Sprintf(":%d", portNum)
-	listenOnPort     = hostIPstr + portNumString
-	
-	
+	flagServerIPStr  string
+	flagServerPort   int
+	flagRefreshDelay int // in seconds
+	flagLocalHost    bool
+	flagCommonMkdn   bool = true // if true then use Common version vs Basic
+	flagBasicMkdn    bool        // if true then use Common version vs Basic
+	flagVerbose      bool
+	flagVersion      bool
+
+	portNum       = 8281
+	portNumString string
+	hostIPstr     string
+	wantLocal     = true
+	listenOnStr   string
+
 	nFiles           int
 	g_fileNames      []string // files with md content
 	loadingFilenames sync.Mutex
-	delayReloadSecs  time.Duration = 300 // reload every 5 minutes
-	
-	myMdDir = []byte{}
+	delayReloadSecs  time.Duration //  = 300 to reload every 5 minutes, set from flag
+
+	myMdDir  = []byte{}
 	pathName string
 )
 
@@ -58,20 +62,74 @@ var myGOs []string = []string{"GoGit", "GoHub", "GoWork", "GoDoc"}
 // skip these entirely
 var skipDirs []string = []string{
 	"/home/mdr/Desktop/GO/GoWork/src/hubmd/tests/",
-} 
-
-func init() {
-	log.SetFlags( /*log.LstdFlags | */ log.Lshortfile)
-	checkInterfaces()
-	go loadFiles()
 }
 
+func init() {
+	log.SetFlags(log.Lshortfile | log.LstdFlags)
+
+	flag.StringVar(&flagServerIPStr, "hostIP", "10.1.2.213", "host IP address")
+	flag.IntVar(&flagServerPort, "port", portNum, "host port number")
+	flag.IntVar(&flagRefreshDelay, "refresh", 300, "delay between refresh of index")
+	flag.BoolVar(&flagLocalHost, "localhost", false, "serve on local host 127.0.0.1")
+	flag.BoolVar(&flagCommonMkdn, "common", true, "Use common markddown styles")
+	flag.BoolVar(&flagBasicMkdn, "basic", false, "Use basic markddown styles")
+	flag.BoolVar(&flagVerbose, "verbose", false, "Use more messages to user")
+	flag.BoolVar(&flagVersion, "version", false, "print version and exit")
+}
+
+func flagSetup() {
+	if !flag.Parsed() {
+		flag.Parse()
+	}
+	Verbose = VerboseType(flagVerbose)
+	if flagCommonMkdn && flagBasicMkdn {
+		fmt.Printf("Can't use both common and basic markdown flags at same time\n")
+	}
+	if flagLocalHost {
+		hostIPstr = "127.0.0.1"
+	} else {
+		if len(flagServerIPStr) > 0 {
+			hostIPstr = flagServerIPStr
+		}
+	}
+	if flagServerPort > 1024 {
+		portNum = flagServerPort
+	}
+	portNumString = fmt.Sprintf(":%d", portNum)
+	listenOnStr = hostIPstr + portNumString
+	Verbose.Printf("Will listen on IP:port %s\n", listenOnStr)
+	var mkdnType string = "unknown"
+	if flagCommonMkdn {
+		mkdnType = "common"
+	}
+	if flagBasicMkdn {
+		mkdnType = "basic"
+	}
+	Verbose.Printf("Will use %s markdown\n", mkdnType)
+	if flagRefreshDelay <= 30 {
+		flagRefreshDelay = 30
+	}
+	delayReloadSecs = time.Duration(flagRefreshDelay)
+	Verbose.Printf("delay between refreshes will be %d seconds\n", flagRefreshDelay)
+	if flagVersion {
+		fmt.Printf("%s\n", version)
+		os.Exit(0)
+	}
+	checkInterfaces()
+}
+
+// loadFiles() will run through the serverRoot directory and build an index
+// of all markdown type files.  This runs as a goroutine that never exits.
+// it will sleep a fixed time after building an index (normally about 5 min)
+// this should be replaced by a select on chan of int to trigger rebuild
+// somehow need to know when dir tree has been modified.  fsnotify/fswatch or ?
 func loadFiles() {
 	pathName := serverRoot
 	for {
 		nFiles = 0
+		// dont serve while building the index
 		loadingFilenames.Lock()
-		g_fileNames = make([]string, 0, 20)
+		g_fileNames = make([]string, 0, 1000)
 		// 8888 TODO ??? next update at ---
 		myMdDir = []byte(`<html><!-- comment --><head><title>Test MD package</title>
 			</head><body>click link to read<br>refresh page if files added to server but
@@ -104,6 +162,8 @@ func loadFiles() {
 	}
 }
 
+// checkMdName treewalk the path and find files that match markdown extensions
+// these file names get appended to g_fileNames as a side effect.
 func checkMdName(pathname string, info os.FileInfo, err error) error {
 	Verbose.Printf("checking %s\n", pathname)
 	if info == nil {
@@ -111,6 +171,7 @@ func checkMdName(pathname string, info os.FileInfo, err error) error {
 		os.Exit(1)
 	}
 	if info.IsDir() {
+		// if dir is in our skiplist then skip it
 		for i := 0; i < len(skipDirs); i++ {
 			if len(pathname) >= len(skipDirs[i]) {
 				if pathname[:len(skipDirs[i])] == skipDirs[i] {
@@ -119,11 +180,18 @@ func checkMdName(pathname string, info os.FileInfo, err error) error {
 			}
 		}
 		return nil
-	} else { // regular file
+	} else {
+		// TODO(mdr) should test if it's really a regular file
 		//log.Printf("found %s %s\n", pathname, filepath.Ext(pathname))
 		ext := filepath.Ext(pathname)
 		if ext == ".md" || ext == ".markdown" || ext == ".mdown" {
 			//log.Printf("basename = %s\n", filepath.Base(pathname))
+
+			/* originally used to ignore README.md since it was a copy of
+			something else.  No longer true.  However, if you were going to
+			ignore something, this would be the place to test for a regex match
+			or whatever...
+
 			if filepath.Base(pathname) == "README.md" {
 				for _, v := range myGOs {
 					if strings.Contains(pathname, v) {
@@ -131,12 +199,14 @@ func checkMdName(pathname string, info os.FileInfo, err error) error {
 					}
 				}
 			}
+			*/
 			g_fileNames = append(g_fileNames, pathname)
 		}
 	}
 	return nil
 }
 
+// makeMdLine create one line of the index file.
 func makeMdLine(i int, s string) []byte {
 	//workDir := serverRoot + mdURL[1:]
 	s = s[len(serverRoot):]
@@ -145,7 +215,7 @@ func makeMdLine(i int, s string) []byte {
 	return []byte(x)
 }
 
-// checkInterfaces - see if listener is bound to correct interface
+// checkInterfaces - see if listener is bound to correct interface.
 // first is localhost, second should be IP4 of active card,
 // third is IP6 localhost, fourth is IP6 for active card (on this system)
 func checkInterfaces() {
@@ -171,11 +241,13 @@ func checkInterfaces() {
 	myIf := myIfs[0]
 	fmt.Printf("myIf = %v\n", myIf)
 	if myIf != hostIPstr {
+		log.Printf("Wanted %s got %s\n", hostIPstr, myIf)
 		log.Fatalf("handler bound to wrong interface")
+
 	}
 }
 
-// mdHandler recognizes markdown extensions and expands to html
+// mdHandler recognizes markdown extensions and expands to html.
 func mdHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == mdURL {
 		loadingFilenames.Lock()
@@ -206,7 +278,7 @@ func mdHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(output)
 }
 
-// htmlFromMd creates html from a markdown style document
+// htmlFromMd creates html from a markdown style document.
 func htmlFromMd(fname string) []byte {
 	var output []byte
 	input, err := ioutil.ReadFile(fname)
@@ -214,9 +286,10 @@ func htmlFromMd(fname string) []byte {
 		tmp := fmt.Sprintf("Problem reading input, can't open %s", fname)
 		output = []byte(tmp)
 	} else {
-		if true { // what's different between these?
+		if flagCommonMkdn { // what's different between these?
 			output = blackfriday.MarkdownCommon(input)
-		} else {
+		}
+		if flagBasicMkdn {
 			output = blackfriday.MarkdownBasic(input)
 		}
 	}
@@ -228,18 +301,18 @@ func htmlFromMd(fname string) []byte {
 }
 
 func main() {
-	//	http.HandleFunc(virtualURL, html)
-	// Handle(serverRoot, is like a dir missing an index "ftp-style"
-	//http.Handle(serverRoot, http.StripPrefix(serverRoot, http.FileServer(http.Dir(serverRoot))))
-	log.SetFlags(log.Lshortfile | log.LstdFlags)
+	flagSetup()
+	go loadFiles()
 	http.HandleFunc(mdURL, mdHandler)
 	http.HandleFunc(imageURL, imageHandler)
 	log.Printf("Compiled on %s\n", CompileDateTime)
-	log.Printf("Server Root = %s\n", serverRoot)
-	log.Printf("image urls syntax required is: http://:%s/images/x.png for example\n", listenOnPort)
-	log.Printf("md server is ready at %s\n", listenOnPort)
-	log.Printf("start browser with this url: %s%s\n", listenOnPort, mdURL)
-	err := http.ListenAndServe(listenOnPort, nil)
+	log.Printf("Version = %s\n", version)
+	log.Printf("Server root = %s\n", serverRoot)
+	log.Printf("Image root = %s\n", imageRoot)
+	log.Printf("image urls syntax is: http://:%s/images/x.png for example\n", listenOnStr)
+	log.Printf("md server is ready at %s\n", listenOnStr)
+	log.Printf("start browser with this url: %s%s\n", listenOnStr, mdURL)
+	err := http.ListenAndServe(listenOnStr, nil)
 	if err != nil {
 		log.Printf("mdserver: error running webserver %v", err)
 	}

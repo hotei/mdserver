@@ -2,6 +2,14 @@
 # mdserver
 </center>
 
+<h3>   <a href="http://godoc.org/github.com/hotei/mdserver">
+<img src="https://godoc.org/github.com/hotei/mdserver?status.png" alt="mdserver" /><br>
+<p>
+</a><a href="http://travis-ci.org/hotei/mdserver">
+<img src="https://secure.travis-ci.org/hotei/mdserver.png" alt="Build Status" /></a>
+Travis status is pending upload from github.
+</h3>
+
 ## OVERVIEW
 
 mdserver reads a directory tree and picks out all files that are markdown documents.
@@ -33,11 +41,13 @@ or if go is not installed yet :
  * .md
  * .mdown
  * .markdown
-* Standalone webserver executable is about 6.5 MB with go 1.4.2
-* supply a list of dirs if you want to exclude them from processing
-* port number served is easily changed - default is 8281 (a random pick)
+* Standalone webserver executable is medium sized (for go)
+	* go 1.4.2 file is about 6.5 MB 
+	* go 1.5rc1 file is about 8.2 MB
+* you can supply a list of dirs if you want to exclude them from processing
+* IP and port number served is set by flag - default is 8281 (a random pick)
 * can be run at "localhost" if appropriate (more secure, but can't be used from other computers)
-* refreshes list every 5 minutes (setable) 
+* refreshes list every 5 minutes (flag setable) 
 
 ### Limitations
 
@@ -58,7 +68,7 @@ None Known
 * Essential:
  * TBD
 * Nice:
- * TBD
+ * use fsnotify to refresh list only when something changes
 
 
 ### Change Log

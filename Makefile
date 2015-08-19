@@ -1,5 +1,5 @@
 # Makefile for mdserver
-	
+
 PROG = mdserver
 VERSION = 0.0.2
 TARDIR = 	$(HOME)/Desktop/TarPit/
@@ -7,7 +7,7 @@ DATE = 	`date "+%Y-%m-%d.%H_%M_%S"`
 DOCOUT = README-$(PROG)-godoc.md
 
 all:
-	godatetime > compileDate.go
+#	godatetime > compileDate.go
 	go build -v
 
 # change cp to echo if you really don't want to install the program
@@ -45,4 +45,3 @@ clean:
 tar:
 	echo $(TARDIR)$(PROG)_$(VERSION)_$(DATE).tar
 	tar -ncvf $(TARDIR)$(PROG)_$(VERSION)_$(DATE).tar .
-

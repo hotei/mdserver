@@ -17,7 +17,6 @@ install:
 	go tool vet .
 	go tool vet -shadow .
 	gofmt -w *.go
-#	killall -q $(PROG)
 	cp $(PROG) $(HOME)/bin
 #	go install
 
